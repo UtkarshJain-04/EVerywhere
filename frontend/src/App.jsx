@@ -1,26 +1,29 @@
 import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
-import HeroSection from './components/HeroSection';
-import WhyChargeNav from './components/WhyChargeNav';
 import Footer from './components/Footer';
+import Home from './pages/Home';
+import About from './pages/About';
 
 export default function App() {
   return (
-    <div className="min-h-screen flex flex-col bg-white text-slate-800 selection:bg-[#0a8754] selection:text-white">
-      {/* Navigation Bar */}
-      <Navbar />
+    <BrowserRouter>
+      <div className="min-h-screen flex flex-col bg-white text-slate-800 selection:bg-[#0a8754] selection:text-white">
+        {/* Persistent Navigation Bar with Active State */}
+        <Navbar />
 
-      {/* Main Content Area */}
-      <main className="flex-1">
-        {/* Hero Section with Route Search and Interactive Phone Mockup */}
-        <HeroSection />
+        {/* Main Routed Page Content */}
+        <main className="flex-1">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
+            <Route path="*" element={<Home />} />
+          </Routes>
+        </main>
 
-        {/* Why ChargeNav Feature Highlights Grid */}
-        <WhyChargeNav />
-      </main>
-
-      {/* Scenic Footer Strip */}
-      <Footer />
-    </div>
+        {/* Persistent Scenic Footer Strip */}
+        <Footer />
+      </div>
+    </BrowserRouter>
   );
 }

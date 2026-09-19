@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Search, Menu, X, Zap } from 'lucide-react';
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
-  const handleNavClick = (e) => {
-    e.preventDefault();
+  const isHome = location.pathname === '/';
+  const isAbout = location.pathname === '/about';
+
+  const handleNavClick = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setMobileMenuOpen(false);
   };
@@ -15,8 +19,8 @@ export default function Navbar() {
       <div className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-14 h-18 flex items-center justify-between">
         
         {/* Left: Brand Logo & Tagline */}
-        <a 
-          href="#home" 
+        <Link 
+          to="/" 
           onClick={handleNavClick}
           className="flex items-center gap-3 group select-none"
         >
@@ -31,23 +35,43 @@ export default function Navbar() {
               Smart Routes. Charged Journeys.
             </span>
           </div>
-        </a>
+        </Link>
 
         {/* Center: Navigation Links (Desktop) */}
         <nav className="hidden md:flex items-center gap-8">
-          <a
-            href="#home"
+          {/* Home Link */}
+          <Link
+            to="/"
             onClick={handleNavClick}
-            className="flex flex-col items-center text-sm font-semibold text-[#0a8754] group"
+            className={`flex flex-col items-center text-sm ${
+              isHome 
+                ? 'font-semibold text-[#0a8754]' 
+                : 'font-medium text-slate-600 hover:text-[#0a8754]'
+            } transition-colors py-1`}
           >
             <span>Home</span>
-            <span className="w-4 h-0.5 bg-[#0a8754] rounded-full mt-1"></span>
-          </a>
+            {isHome && <span className="w-4 h-0.5 bg-[#0a8754] rounded-full mt-1"></span>}
+          </Link>
 
-          {['About', 'Features', 'How It Works', 'Contact'].map((item) => (
+          {/* About Link */}
+          <Link
+            to="/about"
+            onClick={handleNavClick}
+            className={`flex flex-col items-center text-sm ${
+              isAbout 
+                ? 'font-semibold text-[#0a8754]' 
+                : 'font-medium text-slate-600 hover:text-[#0a8754]'
+            } transition-colors py-1`}
+          >
+            <span>About</span>
+            {isAbout && <span className="w-4 h-0.5 bg-[#0a8754] rounded-full mt-1"></span>}
+          </Link>
+
+          {/* Other Links */}
+          {['Features', 'How It Works', 'Contact'].map((item) => (
             <a
               key={item}
-              href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
+              href={`/#${item.toLowerCase().replace(/\s+/g, '-')}`}
               onClick={handleNavClick}
               className="text-sm font-medium text-slate-600 hover:text-[#0a8754] transition-colors py-1"
             >
@@ -62,7 +86,7 @@ export default function Navbar() {
             type="button"
             onClick={handleNavClick}
             aria-label="Search"
-            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors"
+            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
           >
             <Search className="w-4 h-4" />
           </button>
@@ -70,7 +94,7 @@ export default function Navbar() {
           <button
             type="button"
             onClick={handleNavClick}
-            className="px-5 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs"
+            className="px-5 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs cursor-pointer"
           >
             Login
           </button>
@@ -78,7 +102,7 @@ export default function Navbar() {
           <button
             type="button"
             onClick={handleNavClick}
-            className="px-5 py-2 text-sm font-medium text-white bg-[#0a8754] hover:bg-[#087346] rounded-xl transition-all shadow-sm shadow-emerald-600/20"
+            className="px-5 py-2 text-sm font-medium text-white bg-[#0a8754] hover:bg-[#087346] rounded-xl transition-all shadow-sm shadow-emerald-600/20 cursor-pointer"
           >
             Sign Up
           </button>
@@ -99,7 +123,7 @@ export default function Navbar() {
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle navigation menu"
-            className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+            className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -110,17 +134,24 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-t border-slate-100 px-6 pt-4 pb-6 space-y-4 shadow-xl">
           <nav className="flex flex-col space-y-3">
-            <a
-              href="#home"
+            <Link
+              to="/"
               onClick={handleNavClick}
-              className="text-[#0a8754] font-semibold text-base py-1"
+              className={`text-base py-1 ${isHome ? 'text-[#0a8754] font-semibold' : 'text-slate-600 font-medium hover:text-[#0a8754]'}`}
             >
               Home
-            </a>
-            {['About', 'Features', 'How It Works', 'Contact'].map((item) => (
+            </Link>
+            <Link
+              to="/about"
+              onClick={handleNavClick}
+              className={`text-base py-1 ${isAbout ? 'text-[#0a8754] font-semibold' : 'text-slate-600 font-medium hover:text-[#0a8754]'}`}
+            >
+              About
+            </Link>
+            {['Features', 'How It Works', 'Contact'].map((item) => (
               <a
                 key={item}
-                href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
+                href={`/#${item.toLowerCase().replace(/\s+/g, '-')}`}
                 onClick={handleNavClick}
                 className="text-slate-600 hover:text-[#0a8754] text-base py-1 transition-colors"
               >
