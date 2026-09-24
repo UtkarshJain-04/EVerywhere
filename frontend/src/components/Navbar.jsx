@@ -8,6 +8,7 @@ export default function Navbar() {
 
   const isHome = location.pathname === '/';
   const isAbout = location.pathname === '/about';
+  const isFeatures = location.pathname === '/features';
 
   const handleNavClick = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -67,8 +68,22 @@ export default function Navbar() {
             {isAbout && <span className="w-4 h-0.5 bg-[#0a8754] rounded-full mt-1"></span>}
           </Link>
 
+          {/* Features Link */}
+          <Link
+            to="/features"
+            onClick={handleNavClick}
+            className={`flex flex-col items-center text-sm ${
+              isFeatures 
+                ? 'font-semibold text-[#0a8754]' 
+                : 'font-medium text-slate-600 hover:text-[#0a8754]'
+            } transition-colors py-1`}
+          >
+            <span>Features</span>
+            {isFeatures && <span className="w-4 h-0.5 bg-[#0a8754] rounded-full mt-1"></span>}
+          </Link>
+
           {/* Other Links */}
-          {['Features', 'How It Works', 'Contact'].map((item) => (
+          {['How It Works', 'Contact'].map((item) => (
             <a
               key={item}
               href={`/#${item.toLowerCase().replace(/\s+/g, '-')}`}
@@ -148,7 +163,14 @@ export default function Navbar() {
             >
               About
             </Link>
-            {['Features', 'How It Works', 'Contact'].map((item) => (
+            <Link
+              to="/features"
+              onClick={handleNavClick}
+              className={`text-base py-1 ${isFeatures ? 'text-[#0a8754] font-semibold' : 'text-slate-600 font-medium hover:text-[#0a8754]'}`}
+            >
+              Features
+            </Link>
+            {['How It Works', 'Contact'].map((item) => (
               <a
                 key={item}
                 href={`/#${item.toLowerCase().replace(/\s+/g, '-')}`}
