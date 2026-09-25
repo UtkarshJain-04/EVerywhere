@@ -114,13 +114,13 @@ export default function Navbar() {
             Login
           </Link>
 
-          <button
-            type="button"
+          <Link
+            to="/signup"
             onClick={handleNavClick}
-            className="px-5 py-2 text-sm font-medium text-white bg-[#0a8754] hover:bg-[#087346] rounded-xl transition-all shadow-sm shadow-emerald-600/20 cursor-pointer"
+            className="px-5 py-2 text-sm font-medium text-white bg-[#0a8754] hover:bg-[#087346] rounded-xl transition-all shadow-sm shadow-emerald-600/20 cursor-pointer inline-block text-center"
           >
             Sign Up
-          </button>
+          </Link>
         </div>
 
         {/* Mobile Hamburger Button */}
@@ -190,13 +190,13 @@ export default function Navbar() {
             >
               Login
             </Link>
-            <button
-              type="button"
+            <Link
+              to="/signup"
               onClick={handleNavClick}
-              className="w-full py-2.5 text-center text-sm font-medium text-white bg-[#0a8754] hover:bg-[#087346] rounded-xl shadow-sm"
+              className="w-full py-2.5 text-center text-sm font-medium text-white bg-[#0a8754] hover:bg-[#087346] rounded-xl shadow-sm block"
             >
               Sign Up
-            </button>
+            </Link>
           </div>
         </div>
       )}
