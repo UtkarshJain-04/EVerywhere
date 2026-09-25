@@ -106,13 +106,13 @@ export default function Navbar() {
             <Search className="w-4 h-4" />
           </button>
 
-          <button
-            type="button"
+          <Link
+            to="/login"
             onClick={handleNavClick}
-            className="px-5 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs cursor-pointer"
+            className="px-5 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs cursor-pointer inline-block text-center"
           >
             Login
-          </button>
+          </Link>
 
           <button
             type="button"
@@ -183,13 +183,13 @@ export default function Navbar() {
           </nav>
 
           <div className="pt-4 border-t border-slate-100 flex flex-col gap-2.5">
-            <button
-              type="button"
+            <Link
+              to="/login"
               onClick={handleNavClick}
-              className="w-full py-2.5 text-center text-sm font-medium text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50"
+              className="w-full py-2.5 text-center text-sm font-medium text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 block"
             >
               Login
-            </button>
+            </Link>
             <button
               type="button"
               onClick={handleNavClick}
