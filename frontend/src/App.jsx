@@ -6,29 +6,31 @@ import Home from './pages/Home';
 import About from './pages/About';
 import Features from './pages/Features';
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 
 function AppLayout() {
   const location = useLocation();
-  const isLoginPage = location.pathname === '/login';
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-800 selection:bg-[#0a8754] selection:text-white">
       {/* Persistent Navigation Bar with Active State */}
-      {!isLoginPage && <Navbar />}
+      {!isAuthPage && <Navbar />}
 
       {/* Main Routed Page Content */}
-      <main className={isLoginPage ? 'w-full' : 'flex-1'}>
+      <main className={isAuthPage ? 'w-full' : 'flex-1'}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
           <Route path="/features" element={<Features />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </main>
 
       {/* Persistent Scenic Footer Strip */}
-      {!isLoginPage && <Footer />}
+      {!isAuthPage && <Footer />}
     </div>
   );
 }
