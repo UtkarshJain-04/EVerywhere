@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { User, Mail, Lock, Eye, EyeOff, ArrowRight, MapPin, Zap, ShieldCheck } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { User, Mail, Lock, Eye, EyeOff, ArrowRight, MapPin, Zap, ShieldCheck, AlertCircle, Info, Loader2 } from 'lucide-react';
 import loginEvImage from '../assets/login_ev_scenic.jpg';
+import { useAuth } from '../context/AuthContext';
 
 export default function Signup() {
   const [fullName, setFullName] = useState('');
@@ -10,9 +11,58 @@ export default function Signup() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [ssoNotice, setSsoNotice] = useState('');
 
-  const handleSubmit = (e) => {
+  const { signup } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setSsoNotice('');
+
+    if (!fullName.trim()) {
+      setError('Please provide your full name.');
+      return;
+    }
+
+    if (!email.trim()) {
+      setError('Please provide your email address.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter your password.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await signup({
+        name: fullName.trim(),
+        email: email.trim(),
+        password,
+        confirmPassword,
+      });
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err.message || 'Registration failed. Please check your information.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSsoClick = (provider) => {
+    setSsoNotice(
+      `${provider} Single Sign-On is currently awaiting third-party OAuth configuration. Please register with your email and password above.`
+    );
   };
 
   return (
@@ -197,6 +247,22 @@ export default function Signup() {
               </p>
             </div>
 
+            {/* Error Alert */}
+            {error && (
+              <div className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 animate-fadeIn">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
+                <div className="text-xs sm:text-sm font-medium leading-relaxed">{error}</div>
+              </div>
+            )}
+
+            {/* SSO Info Notice */}
+            {ssoNotice && (
+              <div className="mb-4 p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 text-amber-800 animate-fadeIn">
+                <Info className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+                <div className="text-xs sm:text-sm leading-relaxed">{ssoNotice}</div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-3.5">
               {/* 1. Full Name */}
               <div>
@@ -212,10 +278,11 @@ export default function Signup() {
                     id="signup-name"
                     type="text"
                     value={fullName}
+                    disabled={loading}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Enter your full name"
                     required
-                    className="w-full pl-10 sm:pl-11 pr-4 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all"
+                    className="w-full pl-10 sm:pl-11 pr-4 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -234,10 +301,11 @@ export default function Signup() {
                     id="signup-email"
                     type="email"
                     value={email}
+                    disabled={loading}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
                     required
-                    className="w-full pl-10 sm:pl-11 pr-4 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all"
+                    className="w-full pl-10 sm:pl-11 pr-4 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -256,10 +324,11 @@ export default function Signup() {
                     id="signup-password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
+                    disabled={loading}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Create a password"
+                    placeholder="Create a password (min. 6 characters)"
                     required
-                    className="w-full pl-10 sm:pl-11 pr-11 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all"
+                    className="w-full pl-10 sm:pl-11 pr-11 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all disabled:opacity-60"
                   />
                   <button
                     type="button"
@@ -290,10 +359,11 @@ export default function Signup() {
                     id="signup-confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
+                    disabled={loading}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm your password"
                     required
-                    className="w-full pl-10 sm:pl-11 pr-11 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all"
+                    className="w-full pl-10 sm:pl-11 pr-11 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all disabled:opacity-60"
                   />
                   <button
                     type="button"
@@ -313,10 +383,20 @@ export default function Signup() {
               {/* Sign Up Button */}
               <button
                 type="submit"
-                className="w-full mt-4 py-3 px-6 rounded-xl bg-[#0a8754] hover:bg-[#087346] text-white font-semibold text-sm sm:text-base flex items-center justify-center gap-2 shadow-sm shadow-emerald-700/20 hover:shadow-md hover:shadow-emerald-700/30 transition-all cursor-pointer select-none"
+                disabled={loading}
+                className="w-full mt-4 py-3 px-6 rounded-xl bg-[#0a8754] hover:bg-[#087346] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold text-sm sm:text-base flex items-center justify-center gap-2 shadow-sm shadow-emerald-700/20 hover:shadow-md hover:shadow-emerald-700/30 transition-all cursor-pointer select-none"
               >
-                <span>Sign Up</span>
-                <ArrowRight className="w-4 h-4" />
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Creating Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign Up</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </form>
 
@@ -333,6 +413,7 @@ export default function Signup() {
               {/* Google */}
               <button
                 type="button"
+                onClick={() => handleSsoClick('Google')}
                 className="flex items-center justify-center gap-2 py-2.5 sm:py-3 px-3 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-2xs cursor-pointer select-none"
               >
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" viewBox="0 0 24 24">
@@ -347,6 +428,7 @@ export default function Signup() {
               {/* Apple */}
               <button
                 type="button"
+                onClick={() => handleSsoClick('Apple')}
                 className="flex items-center justify-center gap-2 py-2.5 sm:py-3 px-3 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-2xs cursor-pointer select-none"
               >
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 fill-current shrink-0 text-slate-900" viewBox="0 0 24 24">

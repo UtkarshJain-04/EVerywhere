@@ -8,6 +8,8 @@ import Features from './pages/Features';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 
+import { AuthProvider } from './context/AuthContext';
+
 function AppLayout() {
   const location = useLocation();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
@@ -38,7 +40,10 @@ function AppLayout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppLayout />
+      <AuthProvider>
+        <AppLayout />
+      </AuthProvider>
     </BrowserRouter>
   );
 }
+

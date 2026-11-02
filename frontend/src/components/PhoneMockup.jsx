@@ -1,7 +1,13 @@
 import React from 'react';
 import { ArrowLeft, MoreVertical, Zap, MapPin, Compass, Clock, BatteryCharging, Wifi, Signal } from 'lucide-react';
 
-export default function PhoneMockup() {
+export default function PhoneMockup({ routeData, recommendations }) {
+  const originName = routeData?.route?.origin?.displayName?.split(',')[0] || 'Origin';
+  const destName = routeData?.route?.destination?.displayName?.split(',')[0] || 'Destination';
+  const distanceStr = routeData ? `${routeData.route?.roadDistanceKm} km` : '142 km';
+  const durationStr = routeData ? `${routeData.route?.estimatedDurationMinutes} min` : '2 h 48 min';
+  const stopsStr = routeData ? `${recommendations?.length || 0} stops` : '2 stops';
+
   return (
     <div className="relative mx-auto w-[215px] sm:w-[225px] select-none pointer-events-none">
       {/* Phone Outer Chassis - Completely Static, No Hover or Movement */}
@@ -33,8 +39,10 @@ export default function PhoneMockup() {
             <div className="p-0.5 text-slate-700">
               <ArrowLeft className="w-3.5 h-3.5" />
             </div>
-            <div className="text-center">
-              <h3 className="text-[11px] font-bold text-slate-800 leading-none">Your Route</h3>
+            <div className="text-center max-w-[130px] truncate">
+              <h3 className="text-[10px] font-bold text-slate-800 leading-none truncate">
+                {routeData ? `${originName} → ${destName}` : 'Your Route'}
+              </h3>
               <span className="text-[9px] font-medium text-[#0a8754]">Optimized for EV</span>
             </div>
             <div className="p-0.5 text-slate-700">
@@ -138,7 +146,7 @@ export default function PhoneMockup() {
                 <Compass className="w-3 h-3 text-slate-400" />
                 <span>Distance</span>
               </div>
-              <span className="font-bold text-slate-800">142 km</span>
+              <span className="font-bold text-slate-800">{distanceStr}</span>
             </div>
 
             {/* Stat Row: Estimated Time */}
@@ -147,7 +155,7 @@ export default function PhoneMockup() {
                 <Clock className="w-3 h-3 text-slate-400" />
                 <span>Estimated Time</span>
               </div>
-              <span className="font-bold text-slate-800">2 h 48 min</span>
+              <span className="font-bold text-slate-800">{durationStr}</span>
             </div>
 
             {/* Stat Row: Charging Stops */}
@@ -156,7 +164,7 @@ export default function PhoneMockup() {
                 <BatteryCharging className="w-3 h-3 text-[#0a8754]" />
                 <span>Charging Stops</span>
               </div>
-              <span className="font-bold text-slate-800">2 stops</span>
+              <span className="font-bold text-slate-800">{stopsStr}</span>
             </div>
 
             {/* View Details Button */}
