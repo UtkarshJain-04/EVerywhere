@@ -115,16 +115,30 @@ export default function Navbar() {
 
           {isAuthenticated ? (
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200/70 text-slate-800 text-xs font-semibold">
-                <div className="w-6 h-6 rounded-full bg-[#0a8754] text-white flex items-center justify-center font-bold text-[11px]">
+              <Link
+                to="/profile"
+                onClick={handleNavClick}
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200/70 text-slate-800 text-xs font-semibold transition-all cursor-pointer shadow-2xs group"
+                title="View & Edit My Vehicle Profile"
+              >
+                <div className="w-6 h-6 rounded-full bg-[#0a8754] text-white flex items-center justify-center font-bold text-[11px] shrink-0">
                   {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                 </div>
-                <span className="max-w-[120px] truncate">{user?.name || 'Driver'}</span>
-              </div>
+                <div className="flex flex-col text-left">
+                  <span className="max-w-[110px] truncate leading-tight group-hover:text-[#0a8754] transition-colors">
+                    {user?.name || 'Driver'}
+                  </span>
+                  <span className="text-[10px] text-[#0a8754] font-bold leading-none">
+                    {user?.vehicle?.model
+                      ? `${user.vehicle.brand || 'EV'}: ${user.vehicle.batteryCapacity} kWh`
+                      : '+ Add Vehicle'}
+                  </span>
+                </div>
+              </Link>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-red-600 bg-white border border-slate-200 rounded-xl hover:bg-red-50 hover:border-red-200 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-red-600 bg-white border border-slate-200 rounded-xl hover:bg-red-50 hover:border-red-200 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Logout</span>
@@ -213,15 +227,23 @@ export default function Navbar() {
           <div className="pt-4 border-t border-slate-100 flex flex-col gap-2.5">
             {isAuthenticated ? (
               <div className="space-y-2">
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/70 flex items-center gap-3">
+                <Link
+                  to="/profile"
+                  onClick={handleNavClick}
+                  className="p-3 bg-emerald-50 hover:bg-emerald-100/70 rounded-xl border border-emerald-200/70 flex items-center gap-3 transition-colors block"
+                >
                   <div className="w-8 h-8 rounded-full bg-[#0a8754] text-white flex items-center justify-center font-bold text-xs">
                     {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-bold text-slate-800 truncate">{user?.name || 'Driver'}</div>
-                    <div className="text-[11px] text-slate-500 truncate">{user?.email}</div>
+                    <div className="text-[11px] text-[#0a8754] font-semibold truncate">
+                      {user?.vehicle?.model
+                        ? `🚗 ${user.vehicle.model} (${user.vehicle.batteryCapacity} kWh)`
+                        : '+ Add Your Vehicle Profile'}
+                    </div>
                   </div>
-                </div>
+                </Link>
                 <button
                   type="button"
                   onClick={handleLogout}

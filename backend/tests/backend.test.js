@@ -262,7 +262,97 @@ async function runTests() {
     });
     assert(unauthRes.status === 401, 'Protected endpoint /api/auth/me rejects unauthenticated requests with 401');
 
-    // 15. Logout
+    // 15. Vehicle Profile: Save vehicle details
+    const vehicleRes = await makeRequest(
+      {
+        ...baseOptions,
+        path: '/api/auth/vehicle',
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      {
+        brand: 'Tata Motors',
+        model: 'Tata Nexon EV Empowered+',
+        batteryCapacity: 40.5,
+        rangeKm: 453,
+        vehicleType: 'Electric Car',
+        maxChargingSpeed: 50,
+        connectorType: 'CCS2',
+      }
+    );
+    assert(
+      vehicleRes.status === 200 &&
+        vehicleRes.data.success === true &&
+        vehicleRes.data.vehicle.model === 'Tata Nexon EV Empowered+' &&
+        vehicleRes.data.vehicle.batteryCapacity === 40.5,
+      'Vehicle endpoint PUT /api/auth/vehicle successfully saves EV specifications'
+    );
+
+    // 16. Vehicle Profile: Verify persistence in /api/auth/me
+    const meWithVehicleRes = await makeRequest({
+      ...baseOptions,
+      path: '/api/auth/me',
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    assert(
+      meWithVehicleRes.status === 200 &&
+        meWithVehicleRes.data.user.vehicle?.model === 'Tata Nexon EV Empowered+' &&
+        meWithVehicleRes.data.user.vehicle?.connectorType === 'CCS2',
+      'Vehicle specifications persist and return correctly in /api/auth/me'
+    );
+
+    // 17. Personalized Route Planning using saved vehicle specifications
+    const routeWithVehicleRes = await makeRequest(
+      {
+        ...baseOptions,
+        path: '/api/recommendations/route',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      {
+        from: 'Connaught Place',
+        to: 'Hauz Khas',
+        battery: 60,
+        corridorKm: 3,
+      }
+    );
+    assert(
+      routeWithVehicleRes.status === 200 &&
+        routeWithVehicleRes.data.success === true &&
+        routeWithVehicleRes.data.evMetrics?.vehicleBatteryCapacityKwh === 40.5 &&
+        routeWithVehicleRes.data.evMetrics?.vehicleProfile?.isPersonalized === true &&
+        routeWithVehicleRes.data.recommendations.some((s) => s.isConnectorCompatible === true),
+      'Route recommendations incorporate personalized vehicle battery, range, and connector compatibility'
+    );
+
+    // 18. Vehicle Profile: Delete / Reset vehicle
+    const deleteVehicleRes = await makeRequest({
+      ...baseOptions,
+      path: '/api/auth/vehicle',
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    assert(
+      deleteVehicleRes.status === 200 &&
+        deleteVehicleRes.data.success === true &&
+        deleteVehicleRes.data.vehicle.model === '',
+      'Vehicle endpoint DELETE /api/auth/vehicle resets vehicle profile'
+    );
+
+    // 19. Logout
     const logoutRes = await makeRequest(
       {
         ...baseOptions,

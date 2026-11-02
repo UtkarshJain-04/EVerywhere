@@ -208,6 +208,28 @@ export default function RouteRecommendationsSection({
         {/* Results Body */}
         {routeData && !loading && !error && (
           <>
+            {/* Personalized EV Profile Status Banner */}
+            {routeData.evMetrics?.vehicleProfile?.isPersonalized && (
+              <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-slate-50 to-white border border-emerald-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="px-2.5 py-1 rounded-full bg-[#0a8754] text-white text-[10.5px] font-extrabold tracking-wide uppercase shadow-2xs">
+                    Personalized EV Plan
+                  </span>
+                  <div>
+                    <span className="font-extrabold text-[#0d233a] text-sm">
+                      {routeData.evMetrics.vehicleProfile.model}
+                    </span>
+                    <span className="text-slate-500 font-medium ml-2">
+                      ({routeData.evMetrics.vehicleProfile.batteryCapacity} kWh pack • {routeData.evMetrics.vehicleProfile.connectorType} connector • Max {routeData.evMetrics.vehicleProfile.maxChargingSpeed} kW)
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold text-emerald-700 bg-white/80 px-2.5 py-1 rounded-xl border border-emerald-100">
+                  Range &amp; chargers matched to your EV specs
+                </span>
+              </div>
+            )}
+
             {/* Journey Summary Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               
@@ -253,9 +275,14 @@ export default function RouteRecommendationsSection({
                   <div className="text-2xl font-black text-[#0d233a] leading-tight">
                     {routeData.evMetrics?.estimatedRemainingBatteryPercent}%
                   </div>
-                  <span className="text-[10px] text-slate-500">
-                    Est. usage: -{routeData.evMetrics?.estimatedBatteryDropPercent}% ({routeData.evMetrics?.estimatedEnergyKwh} kWh)
+                  <span className="text-[10px] text-slate-500 block">
+                    Est. usage: -{routeData.evMetrics?.estimatedBatteryDropPercent}% ({routeData.evMetrics?.estimatedEnergyKwh} kWh{routeData.evMetrics?.vehicleBatteryCapacityKwh ? ` of ${routeData.evMetrics.vehicleBatteryCapacityKwh} kWh` : ''})
                   </span>
+                  {routeData.evMetrics?.estimatedRemainingRangeKm != null && (
+                    <span className="text-[9.5px] text-[#0a8754] font-semibold block mt-0.5">
+                      Est. range remaining: ~{routeData.evMetrics.estimatedRemainingRangeKm} km
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -270,7 +297,9 @@ export default function RouteRecommendationsSection({
                     {recommendations.length} <span className="text-sm font-semibold text-slate-500">stations</span>
                   </div>
                   <span className="text-[10px] text-emerald-600 font-medium">
-                    Filtered &amp; ranked by algorithm
+                    {routeData.evMetrics?.vehicleProfile?.connectorType
+                      ? `Matching ${routeData.evMetrics.vehicleProfile.connectorType}`
+                      : 'Filtered & ranked by algorithm'}
                   </span>
                 </div>
               </div>
@@ -438,12 +467,17 @@ export default function RouteRecommendationsSection({
                         </p>
 
                         {/* Key Specs Pills */}
-                        <div className="grid grid-cols-2 gap-2 py-3 border-y border-slate-100 mb-4 text-xs">
+                        <div className="grid grid-cols-2 gap-2 py-3 border-y border-slate-100 mb-3 text-xs">
                           <div>
                             <span className="text-[10px] font-semibold text-slate-400 block uppercase">Capacity</span>
                             <span className="font-bold text-slate-800">
                               {station.charging_speed || station.speed} kW ({station.power_type || 'DC'})
                             </span>
+                            {station.isCappedByVehicle && (
+                              <span className="text-[9.5px] text-amber-600 font-semibold block leading-tight">
+                                Capped at {station.vehicleMaxChargingSpeed} kW by EV
+                              </span>
+                            )}
                           </div>
 
                           <div>
@@ -467,6 +501,28 @@ export default function RouteRecommendationsSection({
                             </span>
                           </div>
                         </div>
+
+                        {/* Connector Compatibility & Charging Time Highlights */}
+                        {station.isConnectorCompatible !== undefined && (
+                          <div className="mb-3 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2 text-[10.5px]">
+                            <span
+                              className={`font-bold flex items-center gap-1 ${
+                                station.isConnectorCompatible
+                                  ? 'text-[#0a8754]'
+                                  : 'text-amber-700'
+                              }`}
+                            >
+                              {station.isConnectorCompatible
+                                ? '✓ Connector Compatible'
+                                : '⚠ Adapter Recommended'}
+                            </span>
+                            {station.estimatedChargingTimeMinutes > 0 && (
+                              <span className="font-semibold text-slate-500">
+                                ~{station.estimatedChargingTimeMinutes}m to 80%
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Footer Actions */}

@@ -70,6 +70,22 @@ export function AuthProvider({ children }) {
     setToken(null);
   };
 
+  const saveVehicle = async (vehicleData) => {
+    const res = await api.auth.saveVehicle(vehicleData);
+    if (res && res.user) {
+      setUser(res.user);
+    }
+    return res;
+  };
+
+  const deleteVehicle = async () => {
+    const res = await api.auth.deleteVehicle();
+    if (res && res.user) {
+      setUser(res.user);
+    }
+    return res;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -81,6 +97,8 @@ export function AuthProvider({ children }) {
         signup,
         logout,
         refreshUser,
+        saveVehicle,
+        deleteVehicle,
       }}
     >
       {children}

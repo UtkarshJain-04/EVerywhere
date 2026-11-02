@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   MapPin,
   Flag,
@@ -11,7 +12,9 @@ import {
   ChevronUp,
   Loader2,
   Zap,
+  Car,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function RouteSearchForm({
   onSearchRoute,
@@ -19,6 +22,7 @@ export default function RouteSearchForm({
   initialFrom = '',
   initialTo = '',
 }) {
+  const { user, isAuthenticated } = useAuth();
   const [fromLocation, setFromLocation] = useState(initialFrom);
   const [toLocation, setToLocation] = useState(initialTo);
   const [battery, setBattery] = useState(50);
@@ -80,6 +84,7 @@ export default function RouteSearchForm({
         to: toLocation.trim(),
         battery: Number(battery),
         minSpeed: Number(minSpeed),
+        vehicle: user?.vehicle?.model ? user.vehicle : undefined,
       });
     }
   };
@@ -93,6 +98,7 @@ export default function RouteSearchForm({
         to,
         battery: Number(battery),
         minSpeed: Number(minSpeed),
+        vehicle: user?.vehicle?.model ? user.vehicle : undefined,
       });
     }
   };
@@ -103,6 +109,38 @@ export default function RouteSearchForm({
         onSubmit={handleSubmit}
         className="bg-white rounded-3xl p-2.5 sm:p-3 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.08)] border border-slate-100 flex flex-col gap-2.5 transition-shadow hover:shadow-[0_16px_40px_-6px_rgba(0,0,0,0.12)]"
       >
+        {/* Active EV Profile Banner / Add Vehicle Prompt */}
+        {user?.vehicle?.model ? (
+          <div className="mx-1 px-3.5 py-1.5 rounded-2xl bg-emerald-50/70 border border-emerald-100/90 flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 text-slate-800 min-w-0">
+              <Car className="w-3.5 h-3.5 text-[#0a8754] shrink-0" />
+              <span className="font-extrabold text-[#0a8754] uppercase tracking-wider text-[10px]">Active EV:</span>
+              <span className="font-semibold text-slate-700 truncate text-[11.5px]">
+                {user.vehicle.model} ({user.vehicle.batteryCapacity} kWh • {user.vehicle.connectorType} • {user.vehicle.rangeKm} km)
+              </span>
+            </div>
+            <Link
+              to="/profile"
+              className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline shrink-0 cursor-pointer"
+            >
+              Change Vehicle
+            </Link>
+          </div>
+        ) : isAuthenticated ? (
+          <div className="mx-1 px-3.5 py-1.5 rounded-2xl bg-amber-50/70 border border-amber-200/70 flex items-center justify-between gap-2 text-xs text-amber-900">
+            <div className="flex items-center gap-2">
+              <Car className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="text-[11px]">Add your EV specs to personalize battery drain &amp; charging stops</span>
+            </div>
+            <Link
+              to="/profile"
+              className="text-[11px] font-bold text-[#0a8754] hover:underline shrink-0 cursor-pointer"
+            >
+              + Add Vehicle
+            </Link>
+          </div>
+        ) : null}
+
         {/* Main Inputs Row */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
           
