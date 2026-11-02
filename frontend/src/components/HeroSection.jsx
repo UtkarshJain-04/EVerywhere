@@ -5,7 +5,7 @@ import FeatureHighlights from './FeatureHighlights';
 import PhoneMockup from './PhoneMockup';
 import heroBgImage from '../assets/hero_ev_road.jpg';
 
-export default function HeroSection() {
+export default function HeroSection({ onSearchRoute, loading, routeData, recommendations }) {
   return (
     <section id="home" className="relative w-full overflow-hidden bg-slate-100">
       {/* Background Image: Scenic Coastal Road with Modern White EV */}
@@ -51,7 +51,7 @@ export default function HeroSection() {
 
             {/* Route Search Form */}
             <div className="pt-1">
-              <RouteSearchForm />
+              <RouteSearchForm onSearchRoute={onSearchRoute} loading={loading} />
             </div>
 
             {/* Feature Highlights */}
@@ -60,10 +60,10 @@ export default function HeroSection() {
             </div>
           </div>
 
-          {/* Right Column: Phone Mockup - Completely Static, No Hover or Movement */}
+          {/* Right Column: Phone Mockup - Displays real dynamic route when searched */}
           <div className="lg:col-span-5 xl:col-span-4 flex justify-center lg:justify-end items-center lg:items-start lg:pt-1">
             <div className="w-auto select-none">
-              <PhoneMockup />
+              <PhoneMockup routeData={routeData} recommendations={recommendations} />
             </div>
           </div>
 

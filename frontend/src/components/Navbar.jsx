@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Menu, X, Zap } from 'lucide-react';
+import { Search, Menu, X, Zap, User, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, isAuthenticated, logout } = useAuth();
 
   const isHome = location.pathname === '/';
   const isAbout = location.pathname === '/about';
@@ -12,6 +14,11 @@ export default function Navbar() {
 
   const handleNavClick = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    setMobileMenuOpen(false);
+  };
+
+  const handleLogout = async () => {
+    await logout();
     setMobileMenuOpen(false);
   };
 
@@ -106,21 +113,42 @@ export default function Navbar() {
             <Search className="w-4 h-4" />
           </button>
 
-          <Link
-            to="/login"
-            onClick={handleNavClick}
-            className="px-5 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs cursor-pointer inline-block text-center"
-          >
-            Login
-          </Link>
+          {isAuthenticated ? (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200/70 text-slate-800 text-xs font-semibold">
+                <div className="w-6 h-6 rounded-full bg-[#0a8754] text-white flex items-center justify-center font-bold text-[11px]">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <span className="max-w-[120px] truncate">{user?.name || 'Driver'}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-red-600 bg-white border border-slate-200 rounded-xl hover:bg-red-50 hover:border-red-200 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Logout</span>
+              </button>
+            </div>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                onClick={handleNavClick}
+                className="px-5 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs cursor-pointer inline-block text-center"
+              >
+                Login
+              </Link>
 
-          <Link
-            to="/signup"
-            onClick={handleNavClick}
-            className="px-5 py-2 text-sm font-medium text-white bg-[#0a8754] hover:bg-[#087346] rounded-xl transition-all shadow-sm shadow-emerald-600/20 cursor-pointer inline-block text-center"
-          >
-            Sign Up
-          </Link>
+              <Link
+                to="/signup"
+                onClick={handleNavClick}
+                className="px-5 py-2 text-sm font-medium text-white bg-[#0a8754] hover:bg-[#087346] rounded-xl transition-all shadow-sm shadow-emerald-600/20 cursor-pointer inline-block text-center"
+              >
+                Sign Up
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Hamburger Button */}
@@ -183,20 +211,44 @@ export default function Navbar() {
           </nav>
 
           <div className="pt-4 border-t border-slate-100 flex flex-col gap-2.5">
-            <Link
-              to="/login"
-              onClick={handleNavClick}
-              className="w-full py-2.5 text-center text-sm font-medium text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 block"
-            >
-              Login
-            </Link>
-            <Link
-              to="/signup"
-              onClick={handleNavClick}
-              className="w-full py-2.5 text-center text-sm font-medium text-white bg-[#0a8754] hover:bg-[#087346] rounded-xl shadow-sm block"
-            >
-              Sign Up
-            </Link>
+            {isAuthenticated ? (
+              <div className="space-y-2">
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/70 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[#0a8754] text-white flex items-center justify-center font-bold text-xs">
+                    {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-slate-800 truncate">{user?.name || 'Driver'}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{user?.email}</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full py-2.5 text-center text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Log Out</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  onClick={handleNavClick}
+                  className="w-full py-2.5 text-center text-sm font-medium text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 block"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={handleNavClick}
+                  className="w-full py-2.5 text-center text-sm font-medium text-white bg-[#0a8754] hover:bg-[#087346] rounded-xl shadow-sm block"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -1,15 +1,48 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Info, Loader2 } from 'lucide-react';
 import loginEvImage from '../assets/login_ev_scenic.jpg';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [ssoNotice, setSsoNotice] = useState('');
 
-  const handleSubmit = (e) => {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const redirectPath = location.state?.from?.pathname || '/';
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setSsoNotice('');
+
+    if (!email.trim() || !password) {
+      setError('Please provide both your email address and password.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await login({ email: email.trim(), password });
+      navigate(redirectPath, { replace: true });
+    } catch (err) {
+      setError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSsoClick = (provider) => {
+    setSsoNotice(
+      `${provider} Single Sign-On is currently awaiting third-party OAuth configuration. Please log in using your registered email and password.`
+    );
   };
 
   return (
@@ -189,6 +222,22 @@ export default function Login() {
             </p>
           </div>
 
+          {/* Error Alert */}
+          {error && (
+            <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-700 animate-fadeIn">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
+              <div className="text-xs sm:text-sm font-medium leading-relaxed">{error}</div>
+            </div>
+          )}
+
+          {/* SSO Info Notice */}
+          {ssoNotice && (
+            <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 text-amber-800 animate-fadeIn">
+              <Info className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+              <div className="text-xs sm:text-sm leading-relaxed">{ssoNotice}</div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-4.5">
             {/* Email Address */}
             <div>
@@ -204,10 +253,11 @@ export default function Login() {
                   id="login-email"
                   type="email"
                   value={email}
+                  disabled={loading}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
                   required
-                  className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm sm:text-base focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all"
+                  className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm sm:text-base focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all disabled:opacity-60"
                 />
               </div>
             </div>
@@ -223,7 +273,10 @@ export default function Login() {
                 </label>
                 <a
                   href="#forgot-password"
-                  onClick={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSsoNotice('Password reset functionality is currently handled via administrator assistance.');
+                  }}
                   className="text-xs sm:text-sm font-semibold text-[#0a8754] hover:text-[#087346] hover:underline transition-colors"
                 >
                   Forgot Password?
@@ -235,10 +288,11 @@ export default function Login() {
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
+                  disabled={loading}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   required
-                  className="w-full pl-12 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm sm:text-base focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all"
+                  className="w-full pl-12 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 text-sm sm:text-base focus:outline-none focus:border-[#0a8754] focus:ring-2 focus:ring-[#0a8754]/20 transition-all disabled:opacity-60"
                 />
                 <button
                   type="button"
@@ -258,10 +312,20 @@ export default function Login() {
             {/* Log In Button */}
             <button
               type="submit"
-              className="w-full mt-5 py-3.5 px-6 rounded-xl bg-[#0a8754] hover:bg-[#087346] text-white font-semibold text-base flex items-center justify-center gap-2 shadow-sm shadow-emerald-700/20 hover:shadow-md hover:shadow-emerald-700/30 transition-all cursor-pointer select-none"
+              disabled={loading}
+              className="w-full mt-5 py-3.5 px-6 rounded-xl bg-[#0a8754] hover:bg-[#087346] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold text-base flex items-center justify-center gap-2 shadow-sm shadow-emerald-700/20 hover:shadow-md hover:shadow-emerald-700/30 transition-all cursor-pointer select-none"
             >
-              <span>Log In</span>
-              <ArrowRight className="w-4 h-4" />
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Logging In...</span>
+                </>
+              ) : (
+                <>
+                  <span>Log In</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 
@@ -278,6 +342,7 @@ export default function Login() {
             {/* Google */}
             <button
               type="button"
+              onClick={() => handleSsoClick('Google')}
               className="flex items-center justify-center gap-2.5 py-2.5 sm:py-3 px-4 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-2xs cursor-pointer"
             >
               <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" viewBox="0 0 24 24">
@@ -292,6 +357,7 @@ export default function Login() {
             {/* Apple */}
             <button
               type="button"
+              onClick={() => handleSsoClick('Apple')}
               className="flex items-center justify-center gap-2.5 py-2.5 sm:py-3 px-4 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-2xs cursor-pointer"
             >
               <svg className="w-4 h-4 sm:w-5 sm:h-5 fill-current shrink-0 text-slate-900" viewBox="0 0 24 24">
