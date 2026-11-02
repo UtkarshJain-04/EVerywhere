@@ -132,6 +132,27 @@ export const api = {
     getMe: async () => {
       return request('/auth/me', { method: 'GET' });
     },
+    saveVehicle: async (vehicleData) => {
+      const data = await request('/auth/vehicle', {
+        method: 'PUT',
+        body: vehicleData,
+      });
+      if (data && data.user) {
+        authStorage.setUser(data.user);
+        window.dispatchEvent(new Event('chargenav-auth-change'));
+      }
+      return data;
+    },
+    deleteVehicle: async () => {
+      const data = await request('/auth/vehicle', {
+        method: 'DELETE',
+      });
+      if (data && data.user) {
+        authStorage.setUser(data.user);
+        window.dispatchEvent(new Event('chargenav-auth-change'));
+      }
+      return data;
+    },
     logout: async () => {
       try {
         await request('/auth/logout', { method: 'POST' });

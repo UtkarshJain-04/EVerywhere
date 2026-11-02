@@ -314,6 +314,23 @@ export default function RouteCorridorMap({
             <div><span style="color: #64748b;">Tariff:</span> <strong>${station.cost_per_unit || station.price || 'Standard Rates'}</strong></div>
           </div>
 
+          ${
+            station.isConnectorCompatible !== undefined
+              ? `
+            <div style="margin-bottom: 8px; padding: 4px 7px; border-radius: 6px; font-size: 10px; font-weight: 700; background: ${
+              station.isConnectorCompatible ? '#eaf6ee' : '#fef3c7'
+            }; color: ${station.isConnectorCompatible ? '#0a8754' : '#b45309'}; display: flex; align-items: center; justify-content: space-between;">
+              <span>${station.isConnectorCompatible ? '✓ Matches Your EV Connector' : '⚠ Adapter Recommended'}</span>
+              ${
+                station.estimatedChargingTimeMinutes > 0
+                  ? `<span>~${station.estimatedChargingTimeMinutes}m to 80%</span>`
+                  : ''
+              }
+            </div>
+            `
+              : ''
+          }
+
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 8px; color: #475569;">
             <span>Route Offset: <strong>${station.corridorDistance != null ? `${station.corridorDistance} km` : 'Along route'}</strong></span>
             ${station.distance != null ? `<span>From start: <strong>${station.distance} km</strong></span>` : ''}

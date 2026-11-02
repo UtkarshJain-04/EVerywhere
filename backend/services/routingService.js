@@ -226,9 +226,74 @@ function distanceToPolylineKm(stationLat, stationLon, waypoints) {
 }
 
 /**
- * Plans the complete EV route with compatible charging stations along the route corridor.
+ * Checks connector compatibility between station charger type and vehicle connector.
  */
-async function planEVRoute({ from, to, battery = 50, minSpeed = 0, powerType, vehicleType, corridorKm = 3 }) {
+function checkConnectorCompatibility(station, vehicleConnector) {
+  if (!vehicleConnector) return { isCompatible: true, note: 'Standard EV connector' };
+  const vConn = String(vehicleConnector).toUpperCase().trim();
+  const sType = String(station.charger_type || station.type || '').toUpperCase();
+  const sPower = String(station.power_type || '').toUpperCase();
+
+  // CCS2 (Combined Charging System Type 2)
+  if (vConn.includes('CCS')) {
+    if (
+      sType.includes('COMBO') ||
+      sType.includes('CCS') ||
+      sType.includes('T2-COMBO') ||
+      (sPower === 'DC' && !sType.includes('CHADEMO'))
+    ) {
+      return { isCompatible: true, note: 'Directly compatible with CCS2' };
+    }
+    return { isCompatible: false, note: 'Requires CCS2 adapter / different plug' };
+  }
+
+  // Type 2 (AC Slow/Fast)
+  if (vConn.includes('TYPE 2') || vConn.includes('TYPE2')) {
+    if (
+      sType.includes('AC001') ||
+      sType.includes('TYPE 2') ||
+      sType.includes('TYPE2') ||
+      sType.includes('T2') ||
+      sPower === 'AC'
+    ) {
+      return { isCompatible: true, note: 'Directly compatible with Type 2' };
+    }
+    return { isCompatible: false, note: 'AC Type 2 not supported directly' };
+  }
+
+  // CHAdeMO
+  if (vConn.includes('CHADEMO')) {
+    if (sType.includes('CHADEMO')) {
+      return { isCompatible: true, note: 'Directly compatible with CHAdeMO' };
+    }
+    return { isCompatible: false, note: 'CHAdeMO plug not available' };
+  }
+
+  // GB/T
+  if (vConn.includes('GB/T') || vConn.includes('GBT')) {
+    if (sType.includes('GB/T') || sType.includes('GBT') || sType.includes('DC-001')) {
+      return { isCompatible: true, note: 'Directly compatible with GB/T' };
+    }
+    return { isCompatible: false, note: 'GB/T plug not available' };
+  }
+
+  return { isCompatible: true, note: 'Standard EV compatibility' };
+}
+
+/**
+ * Plans the complete EV route with compatible charging stations along the route corridor.
+ * Personalizes calculations using vehicle specifications when available.
+ */
+async function planEVRoute({
+  from,
+  to,
+  battery = 50,
+  minSpeed = 0,
+  powerType,
+  vehicleType,
+  corridorKm = 3,
+  vehicle = null,
+}) {
   // 1. Resolve start and destination locations
   const startLoc = await geocodeLocation(from);
   const destLoc = await geocodeLocation(to);
@@ -236,15 +301,22 @@ async function planEVRoute({ from, to, battery = 50, minSpeed = 0, powerType, ve
   // 2. Calculate road and geographical distance & route path
   const route = await calculateRoute(startLoc, destLoc);
 
+  // Determine vehicle category (4W vs 2W)
+  const isScooter =
+    (vehicle?.vehicleType && String(vehicle.vehicleType).toLowerCase().includes('scooter')) ||
+    (vehicleType && String(vehicleType).toUpperCase().includes('2W'));
+  const targetVehicleCategory = isScooter ? '2W' : (vehicle || vehicleType ? '4W' : null);
+
   // 3. Find stations along the route corridor (distance to closest point on the road route polyline)
   const allStations = await getStations({});
 
-  // Filter available stations that meet minimum speed
+  // Filter available stations that meet minimum speed and vehicle type
   const candidateStations = allStations.filter((s) => {
     if (Number(s.available) <= 0) return false;
     if (minSpeed && Number(s.capacity) < Number(minSpeed)) return false;
     if (powerType && !String(s.power_type).toLowerCase().includes(powerType.toLowerCase())) return false;
     if (vehicleType && !String(s.vehicle_type).toLowerCase().includes(vehicleType.toLowerCase())) return false;
+    if (targetVehicleCategory && !String(s.vehicle_type).includes(targetVehicleCategory)) return false;
     return true;
   });
 
@@ -280,6 +352,48 @@ async function planEVRoute({ from, to, battery = 50, minSpeed = 0, powerType, ve
     corridorStations = stationsWithRouteDistance.filter((s) => s.corridorDistance <= fallbackCorridor);
   }
 
+  // Energy & Battery calculation personalized with vehicle specifications
+  const batteryCapacity = vehicle && Number(vehicle.batteryCapacity) > 0 ? Number(vehicle.batteryCapacity) : 50;
+  const rangeKm = vehicle && Number(vehicle.rangeKm) > 0 ? Number(vehicle.rangeKm) : (isScooter ? 120 : 300);
+  const maxChargingSpeed = vehicle && Number(vehicle.maxChargingSpeed) > 0 ? Number(vehicle.maxChargingSpeed) : null;
+  const vehicleConnector = vehicle?.connectorType || null;
+
+  // Specific energy consumption (kWh/km)
+  const consumptionRateKwhPerKm = Number((batteryCapacity / Math.max(1, rangeKm)).toFixed(4));
+  const estimatedKwhUsed = Number((route.roadDistanceKm * consumptionRateKwhPerKm).toFixed(1));
+  const estimatedBatteryDropPercent = Math.min(100, Math.round((estimatedKwhUsed / batteryCapacity) * 100));
+  const estimatedRemainingBattery = Math.max(0, Math.round(Number(battery) - estimatedBatteryDropPercent));
+  const estimatedRemainingRangeKm = Math.max(0, Math.round((estimatedRemainingBattery / 100) * rangeKm));
+
+  // Determine if a charging stop is recommended along the journey
+  const startingRangeKm = (Number(battery) / 100) * rangeKm;
+  const needsChargingStop = estimatedRemainingBattery < 20 || route.roadDistanceKm > startingRangeKm * 0.85;
+
+  // Helper to enrich a station with vehicle-specific effective speed, charging time, and connector compatibility
+  const enrichStationWithVehicle = (st) => {
+    const stationCapacity = Number(st.capacity || st.charging_speed || st.speed || 25);
+    const effectiveSpeed = maxChargingSpeed ? Math.min(stationCapacity, maxChargingSpeed) : stationCapacity;
+    const isCapped = maxChargingSpeed ? stationCapacity > maxChargingSpeed : false;
+
+    // Calculate time to charge remaining battery to 80% SoC
+    const targetSoc = 80;
+    const socNeeded = Math.max(0, targetSoc - estimatedRemainingBattery);
+    const kwhTo80 = (socNeeded / 100) * batteryCapacity;
+    const chargingTimeMinutes = effectiveSpeed > 0 ? Math.round((kwhTo80 / (effectiveSpeed * 0.9)) * 60) : null;
+
+    const compatibility = checkConnectorCompatibility(st, vehicleConnector);
+
+    return {
+      ...st,
+      effectiveChargingSpeed: effectiveSpeed,
+      vehicleMaxChargingSpeed: maxChargingSpeed,
+      isCappedByVehicle: isCapped,
+      estimatedChargingTimeMinutes: chargingTimeMinutes,
+      isConnectorCompatible: compatibility.isCompatible,
+      connectorCompatibilityNote: compatibility.note,
+    };
+  };
+
   // 4. Score corridor stations using the Python recommendation engine & 50/50 scoring
   let rankedStations = [];
   try {
@@ -289,7 +403,7 @@ async function planEVRoute({ from, to, battery = 50, minSpeed = 0, powerType, ve
       battery: Number(battery),
       min_charging_speed: Number(minSpeed),
       power_type: powerType,
-      vehicle_type: vehicleType,
+      vehicle_type: vehicleType || targetVehicleCategory,
     });
 
     if (pythonResult && pythonResult.results && pythonResult.results.length > 0) {
@@ -300,13 +414,14 @@ async function planEVRoute({ from, to, battery = 50, minSpeed = 0, powerType, ve
         .filter((pr) => corridorUids.has(String(pr.uid)))
         .map((pr) => {
           const match = corridorStations.find((s) => String(s.uid) === String(pr.uid));
-          return {
+          const base = {
             ...match,
             ...pr,
             isRecommended: true,
             corridorDistance: match ? match.corridorDistance : pr.distance,
             distanceFromStart: match ? match.distanceFromStart : pr.distance,
           };
+          return enrichStationWithVehicle(base);
         });
     }
   } catch (pyErr) {
@@ -324,7 +439,7 @@ async function planEVRoute({ from, to, battery = 50, minSpeed = 0, powerType, ve
       const distScore = maxD === minD ? 1.0 : (maxD - s.corridorDistance) / (maxD - minD);
       const speedScore = (Number(s.capacity) || 0) / (maxS || 1);
       const score = 0.5 * distScore + 0.5 * speedScore;
-      return {
+      const base = {
         uid: s.uid,
         name: s.name,
         vendor_name: s.vendor_name,
@@ -348,21 +463,35 @@ async function planEVRoute({ from, to, battery = 50, minSpeed = 0, powerType, ve
         isRecommended: true,
         score: Number(score.toFixed(4)),
       };
+      return enrichStationWithVehicle(base);
     });
     rankedStations.sort((a, b) => b.score - a.score);
   }
 
+  // If vehicle connector is specified, prioritize compatible stations in recommendation order
+  if (vehicleConnector) {
+    rankedStations.sort((a, b) => {
+      if (a.isConnectorCompatible === b.isConnectorCompatible) {
+        return (b.score || 0) - (a.score || 0);
+      }
+      return a.isConnectorCompatible ? -1 : 1;
+    });
+  }
+
   // Build complete list of corridor stations for map view, flagging recommended ones
   const recommendedUids = new Set(rankedStations.map((s) => String(s.uid)));
-  const allCorridorStations = corridorStations.map((s) => ({
-    ...s,
-    isRecommended: recommendedUids.has(String(s.uid)),
-  }));
+  const allCorridorStations = corridorStations.map((s) => {
+    const enriched = enrichStationWithVehicle(s);
+    return {
+      ...enriched,
+      isRecommended: recommendedUids.has(String(s.uid)),
+    };
+  });
 
-  // Estimate battery consumption along route (~0.18 kWh/km for typical EV)
-  const estimatedKwhUsed = Number((route.roadDistanceKm * 0.18).toFixed(1));
-  const estimatedBatteryDropPercent = Math.min(100, Math.round((estimatedKwhUsed / 50) * 100)); // assuming ~50 kWh battery
-  const estimatedRemainingBattery = Math.max(0, Math.round(Number(battery) - estimatedBatteryDropPercent));
+  const recommendedChargingStopsCount =
+    rankedStations.length > 0 && needsChargingStop
+      ? Math.max(1, Math.ceil(route.roadDistanceKm / (rangeKm * 0.75)))
+      : 0;
 
   return {
     success: true,
@@ -383,7 +512,24 @@ async function planEVRoute({ from, to, battery = 50, minSpeed = 0, powerType, ve
       estimatedBatteryDropPercent,
       estimatedRemainingBatteryPercent: estimatedRemainingBattery,
       estimatedEnergyKwh: estimatedKwhUsed,
-      recommendedChargingStopsCount: rankedStations.length > 0 ? (estimatedRemainingBattery < 20 ? 1 : 0) : 0,
+      estimatedRemainingRangeKm,
+      vehicleRangeKm: rangeKm,
+      vehicleBatteryCapacityKwh: batteryCapacity,
+      consumptionRateKwhPerKm,
+      needsChargingStop,
+      recommendedChargingStopsCount,
+      vehicleProfile: vehicle
+        ? {
+            brand: vehicle.brand || '',
+            model: vehicle.model || '',
+            batteryCapacity,
+            rangeKm,
+            vehicleType: vehicle.vehicleType || (isScooter ? 'Electric Scooter' : 'Electric Car'),
+            maxChargingSpeed,
+            connectorType: vehicleConnector,
+            isPersonalized: true,
+          }
+        : null,
     },
     recommendations: rankedStations,
     corridorStations: allCorridorStations,

@@ -59,10 +59,20 @@ const getStationRecommendations = async (req, res, next) => {
 
 // @desc    Plan an EV journey from starting location to destination with corridor recommendations
 // @route   POST /api/recommendations/route
-// @access  Public
+// @access  Public (Optional auth for personalized vehicle specs)
 const planRoute = async (req, res, next) => {
   try {
-    const { from, to, battery, minSpeed, min_charging_speed, powerType, vehicleType, corridorKm } = req.body;
+    const {
+      from,
+      to,
+      battery,
+      minSpeed,
+      min_charging_speed,
+      powerType,
+      vehicleType,
+      corridorKm,
+      vehicle,
+    } = req.body;
 
     if (!from || !to || !from.trim() || !to.trim()) {
       return res.status(400).json({
@@ -70,6 +80,12 @@ const planRoute = async (req, res, next) => {
         message: 'Please provide both a starting location and a destination.',
       });
     }
+
+    // Resolve vehicle: prefer vehicle sent explicitly in body, or fallback to authenticated user's vehicle
+    const activeVehicle =
+      vehicle && vehicle.model
+        ? vehicle
+        : (req.user && req.user.vehicle && req.user.vehicle.model ? req.user.vehicle : null);
 
     const result = await planEVRoute({
       from: from.trim(),
@@ -79,6 +95,7 @@ const planRoute = async (req, res, next) => {
       powerType,
       vehicleType,
       corridorKm: corridorKm !== undefined ? Number(corridorKm) : 3,
+      vehicle: activeVehicle,
     });
 
     return res.status(200).json(result);

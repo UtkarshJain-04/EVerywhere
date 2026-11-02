@@ -37,6 +37,16 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    vehicle: {
+      brand: { type: String, default: '', trim: true },
+      model: { type: String, default: '', trim: true },
+      batteryCapacity: { type: Number, default: 50 }, // kWh
+      rangeKm: { type: Number, default: 300 }, // km
+      vehicleType: { type: String, default: 'Electric Car', trim: true }, // 'Electric Car' | 'Electric Scooter'
+      maxChargingSpeed: { type: Number, default: 50 }, // kW (max charging capacity)
+      connectorType: { type: String, default: 'CCS2', trim: true }, // CCS2, Type 2, CHAdeMO, etc.
+      updatedAt: { type: Date, default: Date.now },
+    },
   },
   {
     timestamps: true,

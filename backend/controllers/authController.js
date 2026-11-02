@@ -88,6 +88,7 @@ const signup = async (req, res, next) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        vehicle: user.vehicle,
         createdAt: user.createdAt,
       },
     });
@@ -138,6 +139,7 @@ const login = async (req, res, next) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        vehicle: user.vehicle,
         createdAt: user.createdAt,
       },
     });
@@ -177,9 +179,160 @@ const logout = async (req, res) => {
   });
 };
 
+// @desc    Update or save user's vehicle profile
+// @route   PUT /api/auth/vehicle
+// @access  Private (requires JWT)
+const updateVehicle = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Please log in.',
+      });
+    }
+
+    const {
+      brand,
+      model,
+      batteryCapacity,
+      rangeKm,
+      vehicleType,
+      maxChargingSpeed,
+      connectorType,
+    } = req.body;
+
+    if (!model || !String(model).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide your vehicle model name.',
+      });
+    }
+
+    const cap = parseFloat(batteryCapacity);
+    if (isNaN(cap) || cap <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid battery capacity in kWh (greater than 0).',
+      });
+    }
+
+    const range = parseFloat(rangeKm);
+    if (isNaN(range) || range <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid driving range in km (greater than 0).',
+      });
+    }
+
+    const maxSpeed = parseFloat(maxChargingSpeed);
+    if (isNaN(maxSpeed) || maxSpeed <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid maximum charging capacity in kW (greater than 0).',
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User account not found.',
+      });
+    }
+
+    user.vehicle = {
+      brand: (brand || '').trim(),
+      model: (model || '').trim(),
+      batteryCapacity: cap,
+      rangeKm: range,
+      vehicleType: (vehicleType || 'Electric Car').trim(),
+      maxChargingSpeed: maxSpeed,
+      connectorType: (connectorType || 'CCS2').trim(),
+      updatedAt: new Date(),
+    };
+
+    // Synchronize top-level fields for backwards compatibility
+    user.vehicleModel = user.vehicle.model;
+    user.batteryCapacity = cap;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vehicle details saved successfully.',
+      vehicle: user.vehicle,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        vehicle: user.vehicle,
+        vehicleModel: user.vehicleModel,
+        batteryCapacity: user.batteryCapacity,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Remove user's vehicle profile
+// @route   DELETE /api/auth/vehicle
+// @access  Private (requires JWT)
+const deleteVehicle = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Please log in.',
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User account not found.',
+      });
+    }
+
+    user.vehicle = {
+      brand: '',
+      model: '',
+      batteryCapacity: 50,
+      rangeKm: 300,
+      vehicleType: 'Electric Car',
+      maxChargingSpeed: 50,
+      connectorType: 'CCS2',
+      updatedAt: new Date(),
+    };
+    user.vehicleModel = '';
+    user.batteryCapacity = 50;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vehicle details removed successfully.',
+      vehicle: user.vehicle,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        vehicle: user.vehicle,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   signup,
   login,
   getMe,
   logout,
+  updateVehicle,
+  deleteVehicle,
 };
