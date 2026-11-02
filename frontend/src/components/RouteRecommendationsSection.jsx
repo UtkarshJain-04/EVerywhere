@@ -10,6 +10,11 @@ import {
   ShieldCheck,
   AlertCircle,
   RotateCcw,
+  Navigation,
+  Plus,
+  X,
+  RefreshCw,
+  Star,
 } from 'lucide-react';
 import RouteCorridorMap from './RouteCorridorMap';
 
@@ -18,8 +23,14 @@ export default function RouteRecommendationsSection({
   recommendations = [],
   loading = false,
   error = null,
+  selectedStop = null,
+  segmentedRoute = null,
+  segmentLoading = false,
+  onSelectStop,
+  onRemoveStop,
   onRetry,
   onCorridorChange,
+  onOpenStationDetails = null,
 }) {
   const [filterSpeed, setFilterSpeed] = useState('all');
   const [filterPower, setFilterPower] = useState('all');
@@ -72,7 +83,15 @@ export default function RouteRecommendationsSection({
         }&travelmode=driving`
       : null;
 
+  // Google Maps universal URL with selected intermediate stop
+  const multiStopGoogleMapsUrl =
+    originParam && destParam && selectedStop?.latitude != null && selectedStop?.longitude != null
+      ? `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&waypoints=${selectedStop.latitude},${selectedStop.longitude}&travelmode=driving`
+      : null;
+
   const hasStations = validStations.length > 0;
+  const originShortName = routeData?.route?.origin?.displayName?.split(',')[0] || 'Origin';
+  const destShortName = routeData?.route?.destination?.displayName?.split(',')[0] || 'Destination';
 
   // Filter recommendations
   let filtered = [...recommendations];
@@ -108,13 +127,13 @@ export default function RouteRecommendationsSection({
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100/70 text-[#0a8754] text-xs font-bold uppercase tracking-wider mb-2.5">
               <Zap className="w-3.5 h-3.5 fill-[#0a8754]" />
-              <span>Python Recommendation Engine</span>
+              <span>Smart EV Navigation &amp; Recommendation Engine</span>
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#0d233a] tracking-tight">
               EV Route &amp; Recommended Charging Stops
             </h2>
             <p className="text-slate-500 text-xs sm:text-sm mt-1 max-w-2xl">
-              Ranked with a balanced 50% distance score and 50% charging speed score along your route corridor.
+              Click any station marker on the map to add it as an intermediate charging stop and dynamically divide your journey into 2 road segments.
             </p>
           </div>
 
@@ -123,13 +142,25 @@ export default function RouteRecommendationsSection({
               <div className="flex flex-wrap items-center gap-2.5">
                 <div className="text-xs text-slate-500 bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs">
                   <span className="font-semibold text-slate-700">Origin: </span>
-                  <span className="text-emerald-700 font-medium">{routeData.route?.origin?.displayName?.split(',')[0]}</span>
+                  <span className="text-emerald-700 font-medium">{originShortName}</span>
                   <span className="mx-2 text-slate-400">→</span>
                   <span className="font-semibold text-slate-700">Destination: </span>
-                  <span className="text-emerald-700 font-medium">{routeData.route?.destination?.displayName?.split(',')[0]}</span>
+                  <span className="text-emerald-700 font-medium">{destShortName}</span>
                 </div>
 
-                {hasStations ? (
+                {selectedStop && multiStopGoogleMapsUrl ? (
+                  <a
+                    href={multiStopGoogleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0a8754] hover:bg-[#087346] text-white text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer select-none whitespace-nowrap"
+                    title="Open full 2-leg route with intermediate charging stop in Google Maps"
+                  >
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>Open Full Journey in Google Maps</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                ) : hasStations ? (
                   <a
                     href={googleMapsUrl}
                     target="_blank"
@@ -159,8 +190,10 @@ export default function RouteRecommendationsSection({
 
               {hasStations ? (
                 <span className="text-[11px] text-slate-500 text-right">
-                  {validStations.length > MAX_MAP_WAYPOINTS
-                    ? `*Google Maps route displays top ${MAX_MAP_WAYPOINTS} of ${validStations.length} recommended charging stops along corridor (Google Maps waypoint limit)`
+                  {selectedStop
+                    ? `*Selected stop: ${selectedStop.name} (${selectedStop.charging_speed || selectedStop.speed || 25} kW)`
+                    : validStations.length > MAX_MAP_WAYPOINTS
+                    ? `*Google Maps route displays top ${MAX_MAP_WAYPOINTS} of ${validStations.length} recommended charging stops along corridor`
                     : `*Google Maps route displays all ${validStations.length} recommended charging stop${validStations.length === 1 ? '' : 's'} along corridor`}
                 </span>
               ) : (
@@ -241,10 +274,15 @@ export default function RouteRecommendationsSection({
                 <div>
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Road Distance</span>
                   <div className="text-2xl font-black text-[#0d233a] leading-tight">
-                    {routeData.route?.roadDistanceKm} <span className="text-sm font-semibold text-slate-500">km</span>
+                    {segmentedRoute?.overallTrip?.totalRoadDistanceKm != null
+                      ? segmentedRoute.overallTrip.totalRoadDistanceKm
+                      : routeData.route?.roadDistanceKm}{' '}
+                    <span className="text-sm font-semibold text-slate-500">km</span>
                   </div>
                   <span className="text-[10px] text-slate-500">
-                    Straight-line: {routeData.route?.geographicalDistanceKm} km
+                    {segmentedRoute?.overallTrip?.detourKm > 0
+                      ? `+${segmentedRoute.overallTrip.detourKm} km detour via stop`
+                      : `Straight-line: ${routeData.route?.geographicalDistanceKm} km`}
                   </span>
                 </div>
               </div>
@@ -257,10 +295,17 @@ export default function RouteRecommendationsSection({
                 <div>
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Estimated Duration</span>
                   <div className="text-2xl font-black text-[#0d233a] leading-tight">
-                    {routeData.route?.estimatedDurationMinutes} <span className="text-sm font-semibold text-slate-500">mins</span>
+                    {segmentedRoute?.overallTrip?.totalTripDurationMinutes != null
+                      ? segmentedRoute.overallTrip.totalTripDurationMinutes
+                      : routeData.route?.estimatedDurationMinutes}{' '}
+                    <span className="text-sm font-semibold text-slate-500">mins</span>
                   </div>
                   <span className="text-[10px] text-slate-500">
-                    {routeData.route?.isRoadRouteReal ? 'Road navigation model' : 'Average urban speed model'}
+                    {segmentedRoute?.overallTrip
+                      ? `${segmentedRoute.overallTrip.totalDrivingMinutes}m drive + ${segmentedRoute.overallTrip.estimatedChargingTimeMinutes}m charge`
+                      : routeData.route?.isRoadRouteReal
+                      ? 'Road navigation model'
+                      : 'Average urban speed model'}
                   </span>
                 </div>
               </div>
@@ -273,12 +318,16 @@ export default function RouteRecommendationsSection({
                 <div>
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Estimated Battery</span>
                   <div className="text-2xl font-black text-[#0d233a] leading-tight">
-                    {routeData.evMetrics?.estimatedRemainingBatteryPercent}%
+                    {segmentedRoute?.evMetrics?.batteryFinalPercent != null
+                      ? `${segmentedRoute.evMetrics.batteryFinalPercent}%`
+                      : `${routeData.evMetrics?.estimatedRemainingBatteryPercent}%`}
                   </div>
                   <span className="text-[10px] text-slate-500 block">
-                    Est. usage: -{routeData.evMetrics?.estimatedBatteryDropPercent}% ({routeData.evMetrics?.estimatedEnergyKwh} kWh{routeData.evMetrics?.vehicleBatteryCapacityKwh ? ` of ${routeData.evMetrics.vehicleBatteryCapacityKwh} kWh` : ''})
+                    {segmentedRoute?.segment1
+                      ? `At Stop: ${segmentedRoute.segment1.batteryArrivalPercent}% • Recharged to 80%`
+                      : `Est. usage: -${routeData.evMetrics?.estimatedBatteryDropPercent}% (${routeData.evMetrics?.estimatedEnergyKwh} kWh)`}
                   </span>
-                  {routeData.evMetrics?.estimatedRemainingRangeKm != null && (
+                  {routeData.evMetrics?.estimatedRemainingRangeKm != null && !segmentedRoute && (
                     <span className="text-[9.5px] text-[#0a8754] font-semibold block mt-0.5">
                       Est. range remaining: ~{routeData.evMetrics.estimatedRemainingRangeKm} km
                     </span>
@@ -286,33 +335,39 @@ export default function RouteRecommendationsSection({
                 </div>
               </div>
 
-              {/* Card 4: Recommended Stops */}
+              {/* Card 4: Selected Stop Status */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Compatible Stops</span>
-                  <div className="text-2xl font-black text-[#0d233a] leading-tight">
-                    {recommendations.length} <span className="text-sm font-semibold text-slate-500">stations</span>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Selected Stop</span>
+                  <div className="text-base font-black text-[#0d233a] leading-tight truncate max-w-[170px]" title={selectedStop?.name || 'None selected'}>
+                    {selectedStop ? selectedStop.name : 'Direct Route'}
                   </div>
-                  <span className="text-[10px] text-emerald-600 font-medium">
-                    {routeData.evMetrics?.vehicleProfile?.connectorType
-                      ? `Matching ${routeData.evMetrics.vehicleProfile.connectorType}`
-                      : 'Filtered & ranked by algorithm'}
+                  <span className="text-[10px] text-emerald-600 font-semibold block mt-0.5">
+                    {selectedStop
+                      ? `${selectedStop.charging_speed || selectedStop.speed || 25} kW Charger Stop`
+                      : `${recommendations.length} stations available`}
                   </span>
                 </div>
               </div>
 
             </div>
 
-            {/* Interactive Route Corridor Map (PlugShare style) */}
+            {/* Interactive Route Corridor Map (Primary Focus of Feature - PlugShare style with dynamic 2 segments) */}
             <RouteCorridorMap
               routeData={routeData}
               recommendations={recommendations}
               corridorStations={routeData.corridorStations || recommendations}
               activeCorridorKm={routeData.route?.corridorKm || 3}
               onCorridorChange={onCorridorChange}
+              selectedStop={selectedStop}
+              segmentedRoute={segmentedRoute}
+              segmentLoading={segmentLoading}
+              onSelectStop={onSelectStop}
+              onRemoveStop={onRemoveStop}
+              onOpenStationDetails={onOpenStationDetails}
             />
 
             {/* Filter and Sorting Controls Bar */}
@@ -408,12 +463,18 @@ export default function RouteRecommendationsSection({
                   const matchPercent = Math.round((station.score || 0) * 100);
                   const isTopMatch = index === 0 && sortBy === 'score';
                   const distanceKm = Number(station.distance || station.corridorDistance || 0).toFixed(1);
+                  const isCurrentStop = selectedStop && String(selectedStop.uid) === String(station.uid);
+
+                  // Precise Google Maps directions URL from user's entered source to this station
+                  const stationDirectionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${station.latitude},${station.longitude}&travelmode=driving`;
 
                   return (
                     <div
                       key={station.uid || index}
                       className={`relative bg-white rounded-2xl sm:rounded-3xl p-5 border transition-all duration-300 hover:shadow-lg flex flex-col justify-between ${
-                        isTopMatch
+                        isCurrentStop
+                          ? 'border-amber-500 ring-2 ring-amber-400/40 shadow-md bg-amber-50/15'
+                          : isTopMatch
                           ? 'border-[#0a8754] ring-2 ring-[#0a8754]/15 shadow-md shadow-emerald-700/5'
                           : 'border-slate-200/90 shadow-2xs hover:border-slate-300'
                       }`}
@@ -421,8 +482,12 @@ export default function RouteRecommendationsSection({
                       {/* Top Badges */}
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-3">
-                          <div className="flex items-center gap-1.5">
-                            {isTopMatch ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {isCurrentStop ? (
+                              <span className="px-2.5 py-1 rounded-full bg-amber-500 text-white text-[10.5px] font-black tracking-wide uppercase shadow-2xs flex items-center gap-1">
+                                <span>⚡ ACTIVE STOP</span>
+                              </span>
+                            ) : isTopMatch ? (
                               <span className="px-2.5 py-1 rounded-full bg-[#0a8754] text-white text-[10.5px] font-bold tracking-wide uppercase shadow-2xs">
                                 #1 Top Recommended
                               </span>
@@ -451,11 +516,23 @@ export default function RouteRecommendationsSection({
                           </div>
                         </div>
 
-                        {/* Station Name & Vendor */}
+                        {/* Station Name & Vendor with Rating Badge */}
                         <div className="mb-2.5">
-                          <h3 className="text-base sm:text-lg font-bold text-[#0d233a] leading-tight">
-                            {station.name}
-                          </h3>
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="text-base sm:text-lg font-bold text-[#0d233a] leading-tight">
+                              {station.name}
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={() => onOpenStationDetails?.(station)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200/90 text-amber-900 text-[11px] font-bold transition-colors cursor-pointer shrink-0"
+                              title="View community reviews, ratings, and photos"
+                            >
+                              <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                              <span>{Number(station.averageRating || 4.5).toFixed(1)}</span>
+                              <span className="text-slate-400 font-medium text-[10px]">({station.reviewCount || 12})</span>
+                            </button>
+                          </div>
                           <span className="text-xs font-semibold text-[#0a8754] tracking-tight">
                             {station.vendor_name || 'ChargeNav Network'}
                           </span>
@@ -525,21 +602,65 @@ export default function RouteRecommendationsSection({
                         )}
                       </div>
 
-                      {/* Footer Actions */}
-                      <div className="flex items-center justify-between gap-2 pt-1">
-                        <div className="text-[11px] text-slate-500">
-                          Total plugs: <span className="font-semibold text-slate-700">{station.total || 2}</span>
-                        </div>
+                      {/* Footer Actions: Interactive Charging Stop Controls */}
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100/80">
+                        {isCurrentStop ? (
+                          <button
+                            type="button"
+                            onClick={() => onRemoveStop?.()}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+                            title="Remove this charging stop and restore direct route"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Remove Stop</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onSelectStop?.(station)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-[#0a8754] text-[#0a8754] hover:text-white border border-emerald-200 hover:border-transparent text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                            title={selectedStop ? 'Switch route intermediate stop to this station' : 'Add to route as intermediate charging stop'}
+                          >
+                            {selectedStop ? <RefreshCw className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                            <span>{selectedStop ? 'Switch Stop' : 'Add as Stop'}</span>
+                          </button>
+                        )}
 
-                        <a
-                          href={`https://www.google.com/maps/search/?api=1&query=${station.latitude},${station.longitude}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-[#0a8754] text-slate-700 hover:text-white text-xs font-semibold transition-all cursor-pointer"
-                        >
-                          <span>Open in Maps</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onOpenStationDetails?.(station)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 text-xs font-bold transition-all cursor-pointer"
+                            title="Open community reviews, photos, and ratings"
+                          >
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                            <span>Reviews</span>
+                          </button>
+
+                          {isCurrentStop && multiStopGoogleMapsUrl && (
+                            <a
+                              href={multiStopGoogleMapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#0a8754] hover:bg-[#087346] text-white text-xs font-bold transition-all cursor-pointer"
+                              title="Open complete multi-stop journey in Google Maps"
+                            >
+                              <Navigation className="w-3 h-3" />
+                              <span>Full Route</span>
+                            </a>
+                          )}
+
+                          <a
+                            href={stationDirectionsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all cursor-pointer"
+                            title={`Open directions from ${originShortName} to ${station.name} in Google Maps`}
+                          >
+                            <span>Navigate</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
                       </div>
                     </div>
                   );

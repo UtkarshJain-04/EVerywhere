@@ -103,6 +103,15 @@ const stationSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    averageRating: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
+    reviewCount: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

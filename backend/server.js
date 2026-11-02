@@ -1,21 +1,26 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const config = require('./config/env');
 const connectDB = require('./db');
 const { seedStations } = require('./services/stationDataService');
+const { seedInitialReviews } = require('./services/seedReviewsService');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
 const authRoutes = require('./routes/authRoutes');
 const stationRoutes = require('./routes/stationRoutes');
 const recommendationRoutes = require('./routes/recommendationRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 const app = express();
 
 // Initialize MongoDB connection & seed dataset on startup
 connectDB().then(() => {
-  seedStations().catch((err) =>
-    console.warn('Initial station sync skipped or failed:', err.message)
-  );
+  seedStations()
+    .then(() => seedInitialReviews())
+    .catch((err) =>
+      console.warn('Initial station sync skipped or failed:', err.message)
+    );
 });
 
 // Configure CORS
@@ -48,6 +53,9 @@ app.use(
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
+// Serve static uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Health Check API
 app.get('/api/health', (req, res) => {
   res.status(200).json({
@@ -67,6 +75,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/stations', stationRoutes);
 app.use('/api/recommendations', recommendationRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // Error Handling Middleware
 app.use(notFoundHandler);

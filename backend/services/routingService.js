@@ -537,9 +537,139 @@ async function planEVRoute({
   };
 }
 
+/**
+ * Calculates a dynamic two-segment journey:
+ * Segment 1: Source -> Selected Charging Station
+ * Segment 2: Selected Charging Station -> Final Destination
+ */
+async function planEVRouteWithStop({
+  from,
+  to,
+  stopStation,
+  battery = 50,
+  vehicle = null,
+}) {
+  if (!stopStation || stopStation.latitude == null || stopStation.longitude == null) {
+    throw new Error('Please select a valid charging station with coordinates.');
+  }
+
+  // 1. Resolve source and destination
+  const startLoc = typeof from === 'object' && from.latitude != null ? from : await geocodeLocation(from);
+  const destLoc = typeof to === 'object' && to.latitude != null ? to : await geocodeLocation(to);
+
+  const stopLoc = {
+    latitude: Number(stopStation.latitude),
+    longitude: Number(stopStation.longitude),
+    displayName: stopStation.name || 'Charging Station',
+    address: stopStation.address || '',
+  };
+
+  // 2. Calculate both segments and direct route for comparison
+  const [leg1, leg2, directRoute] = await Promise.all([
+    calculateRoute(startLoc, stopLoc),
+    calculateRoute(stopLoc, destLoc),
+    calculateRoute(startLoc, destLoc),
+  ]);
+
+  // 3. Vehicle energy parameters
+  const isScooter =
+    (vehicle?.vehicleType && String(vehicle.vehicleType).toLowerCase().includes('scooter')) ||
+    (stopStation.vehicle_type && String(stopStation.vehicle_type).includes('2W') && !String(stopStation.vehicle_type).includes('4W'));
+  const batteryCapacity = vehicle && Number(vehicle.batteryCapacity) > 0 ? Number(vehicle.batteryCapacity) : 50;
+  const rangeKm = vehicle && Number(vehicle.rangeKm) > 0 ? Number(vehicle.rangeKm) : (isScooter ? 120 : 300);
+  const maxChargingSpeed = vehicle && Number(vehicle.maxChargingSpeed) > 0 ? Number(vehicle.maxChargingSpeed) : null;
+  const consumptionRateKwhPerKm = Number((batteryCapacity / Math.max(1, rangeKm)).toFixed(4));
+
+  // Segment 1 Energy
+  const leg1EnergyKwh = Number((leg1.roadDistanceKm * consumptionRateKwhPerKm).toFixed(1));
+  const leg1BatteryDropPercent = Math.min(100, Math.round((leg1EnergyKwh / batteryCapacity) * 100));
+  const batteryAtStopPercent = Math.max(0, Math.round(Number(battery) - leg1BatteryDropPercent));
+  const rangeAtStopKm = Math.max(0, Math.round((batteryAtStopPercent / 100) * rangeKm));
+
+  // Charging at Stop
+  const stationCapacity = Number(stopStation.capacity || stopStation.charging_speed || stopStation.speed || 25);
+  const effectiveSpeed = maxChargingSpeed ? Math.min(stationCapacity, maxChargingSpeed) : stationCapacity;
+  const targetSoc = 80;
+  const socNeeded = Math.max(0, targetSoc - batteryAtStopPercent);
+  const kwhTo80 = (socNeeded / 100) * batteryCapacity;
+  const chargingTimeMinutes = effectiveSpeed > 0 ? Math.round((kwhTo80 / (effectiveSpeed * 0.9)) * 60) : 20;
+
+  // Departing from Stop (charged to 80% or +35%)
+  const batteryDepartingStopPercent = Math.min(100, Math.max(80, batteryAtStopPercent + 30));
+
+  // Segment 2 Energy
+  const leg2EnergyKwh = Number((leg2.roadDistanceKm * consumptionRateKwhPerKm).toFixed(1));
+  const leg2BatteryDropPercent = Math.min(100, Math.round((leg2EnergyKwh / batteryCapacity) * 100));
+  const batteryAtDestinationPercent = Math.max(0, Math.round(batteryDepartingStopPercent - leg2BatteryDropPercent));
+  const rangeAtDestinationKm = Math.max(0, Math.round((batteryAtDestinationPercent / 100) * rangeKm));
+
+  // Overall totals
+  const totalRoadDistanceKm = Number((leg1.roadDistanceKm + leg2.roadDistanceKm).toFixed(2));
+  const totalDrivingMinutes = leg1.estimatedDurationMinutes + leg2.estimatedDurationMinutes;
+  const detourKm = Number(Math.max(0, totalRoadDistanceKm - directRoute.roadDistanceKm).toFixed(2));
+
+  // Combined continuous polyline waypoints for bounds fitting
+  const combinedWaypoints = [...leg1.waypoints, ...leg2.waypoints];
+
+  return {
+    success: true,
+    hasStop: true,
+    selectedStop: {
+      ...stopStation,
+      latitude: stopLoc.latitude,
+      longitude: stopLoc.longitude,
+      effectiveChargingSpeed: effectiveSpeed,
+      estimatedChargingTimeMinutes: chargingTimeMinutes,
+    },
+    segment1: {
+      from: startLoc,
+      to: stopLoc,
+      roadDistanceKm: leg1.roadDistanceKm,
+      geographicalDistanceKm: leg1.geographicalDistanceKm,
+      estimatedDurationMinutes: leg1.estimatedDurationMinutes,
+      isRoadRouteReal: leg1.isRoadRouteReal,
+      waypoints: leg1.waypoints,
+      batteryArrivalPercent: batteryAtStopPercent,
+      energyKwh: leg1EnergyKwh,
+      remainingRangeAtArrivalKm: rangeAtStopKm,
+    },
+    segment2: {
+      from: stopLoc,
+      to: destLoc,
+      roadDistanceKm: leg2.roadDistanceKm,
+      geographicalDistanceKm: leg2.geographicalDistanceKm,
+      estimatedDurationMinutes: leg2.estimatedDurationMinutes,
+      isRoadRouteReal: leg2.isRoadRouteReal,
+      waypoints: leg2.waypoints,
+      batteryDeparturePercent: batteryDepartingStopPercent,
+      batteryFinalPercent: batteryAtDestinationPercent,
+      energyKwh: leg2EnergyKwh,
+      remainingRangeAtFinalKm: rangeAtDestinationKm,
+    },
+    overallTrip: {
+      totalRoadDistanceKm,
+      directRoadDistanceKm: directRoute.roadDistanceKm,
+      detourKm,
+      totalDrivingMinutes,
+      estimatedChargingTimeMinutes: chargingTimeMinutes,
+      totalTripDurationMinutes: totalDrivingMinutes + chargingTimeMinutes,
+      waypoints: combinedWaypoints,
+    },
+    evMetrics: {
+      startingBatteryPercent: Number(battery),
+      batteryAtStopPercent,
+      batteryDepartingStopPercent,
+      batteryFinalPercent: batteryAtDestinationPercent,
+      totalEnergyKwh: Number((leg1EnergyKwh + leg2EnergyKwh).toFixed(1)),
+      vehicleProfile: vehicle,
+    },
+  };
+}
+
 module.exports = {
   geocodeLocation,
   calculateRoute,
   planEVRoute,
+  planEVRouteWithStop,
   LOCAL_LANDMARKS,
 };

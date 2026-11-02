@@ -335,7 +335,43 @@ async function runTests() {
       'Route recommendations incorporate personalized vehicle battery, range, and connector compatibility'
     );
 
-    // 18. Vehicle Profile: Delete / Reset vehicle
+    // 18. Dynamic Route Integration with Intermediate Charging Stop
+    const routeWithStopRes = await makeRequest(
+      {
+        ...baseOptions,
+        path: '/api/recommendations/route/with-stop',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      {
+        from: 'Connaught Place',
+        to: 'Hauz Khas',
+        stopStation: {
+          name: 'DMRC Hauz Khas Parking',
+          latitude: 28.54488,
+          longitude: 77.20691,
+          capacity: 30,
+          charger_type: 'CCS2',
+        },
+        battery: 60,
+      }
+    );
+    assert(
+      routeWithStopRes.status === 200 &&
+        routeWithStopRes.data.success === true &&
+        routeWithStopRes.data.hasStop === true &&
+        Boolean(routeWithStopRes.data.segment1?.waypoints?.length) &&
+        Boolean(routeWithStopRes.data.segment2?.waypoints?.length) &&
+        routeWithStopRes.data.segment1.roadDistanceKm > 0 &&
+        routeWithStopRes.data.segment2.roadDistanceKm > 0 &&
+        routeWithStopRes.data.overallTrip.totalRoadDistanceKm > 0,
+      'Multi-segment route endpoint /api/recommendations/route/with-stop divides route into Source->Station and Station->Destination'
+    );
+
+    // 19. Vehicle Profile: Delete / Reset vehicle
     const deleteVehicleRes = await makeRequest({
       ...baseOptions,
       path: '/api/auth/vehicle',
@@ -352,7 +388,120 @@ async function runTests() {
       'Vehicle endpoint DELETE /api/auth/vehicle resets vehicle profile'
     );
 
-    // 19. Logout
+    // 20. Community Reviews: Get station reviews
+    const reviewsRes = await makeRequest({
+      ...baseOptions,
+      path: '/api/reviews/station/EESL428',
+      method: 'GET',
+    });
+    assert(
+      reviewsRes.status === 200 &&
+        reviewsRes.data.success === true &&
+        Array.isArray(reviewsRes.data.reviews) &&
+        reviewsRes.data.stationStats &&
+        typeof reviewsRes.data.stationStats.averageRating === 'number',
+      'Community Reviews endpoint /api/reviews/station/:id retrieves reviews and summary stats'
+    );
+
+    // 21. Record Verified Visit
+    const visitRes = await makeRequest(
+      {
+        ...baseOptions,
+        path: '/api/reviews/station/EESL428/record-visit',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      {
+        stationName: 'EESL Charging Station',
+        origin: 'Connaught Place',
+        destination: 'Hauz Khas',
+      }
+    );
+    assert(
+      visitRes.status === 200 && visitRes.data.success === true && visitRes.data.isVerifiedVisit === true,
+      'Verified Visit endpoint /api/reviews/station/:id/record-visit records charging visit'
+    );
+
+    // 22. Submit User Review (with Verified Visit badge)
+    const submitReviewRes = await makeRequest(
+      {
+        ...baseOptions,
+        path: '/api/reviews/station/EESL428',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      {
+        rating: 5,
+        reviewText: 'Great charging spot! Reliable 25 kW DC output and friendly staff.',
+        evFeedback: {
+          chargingSpeed: 'Blazing Fast',
+          stationCondition: 'All Chargers Working',
+          waitTime: 'No Wait',
+        },
+      }
+    );
+    assert(
+      submitReviewRes.status === 201 &&
+        submitReviewRes.data.success === true &&
+        submitReviewRes.data.review &&
+        submitReviewRes.data.isVerifiedVisit === true,
+      'Submit Review endpoint /api/reviews/station/:id creates review with Verified Visit badge'
+    );
+
+    const createdReviewId = submitReviewRes.data.review._id;
+
+    // 23. Toggle Helpful Vote
+    const helpfulRes = await makeRequest(
+      {
+        ...baseOptions,
+        path: `/api/reviews/${createdReviewId}/helpful`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      {}
+    );
+    // Since user cannot vote on own review, status 400 is expected and correct!
+    assert(
+      helpfulRes.status === 400 && helpfulRes.data.success === false,
+      'Helpful vote prevents user from voting on their own review'
+    );
+
+    // 24. Station Media Gallery
+    const mediaRes = await makeRequest({
+      ...baseOptions,
+      path: '/api/reviews/station/EESL428/media',
+      method: 'GET',
+    });
+    assert(
+      mediaRes.status === 200 && mediaRes.data.success === true && Array.isArray(mediaRes.data.media),
+      'Station Media endpoint /api/reviews/station/:id/media returns media gallery'
+    );
+
+    // 25. Delete User Review
+    const deleteReviewRes = await makeRequest({
+      ...baseOptions,
+      path: `/api/reviews/${createdReviewId}`,
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    assert(
+      deleteReviewRes.status === 200 && deleteReviewRes.data.success === true,
+      'Delete review endpoint /api/reviews/:id allows author to delete review'
+    );
+
+    // 26. Logout
     const logoutRes = await makeRequest(
       {
         ...baseOptions,
