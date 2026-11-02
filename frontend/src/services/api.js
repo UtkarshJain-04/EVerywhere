@@ -55,9 +55,10 @@ export const authStorage = {
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = authStorage.getToken();
+  const isFormData = options.body instanceof FormData;
 
   const headers = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
@@ -67,7 +68,7 @@ async function request(endpoint, options = {}) {
     headers,
   };
 
-  if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
+  if (config.body && typeof config.body === 'object' && !isFormData) {
     config.body = JSON.stringify(config.body);
   }
 
@@ -186,6 +187,58 @@ export const api = {
       return request('/recommendations/route', {
         method: 'POST',
         body: routeQuery,
+      });
+    },
+    planRouteWithStop: (routeQuery) => {
+      return request('/recommendations/route/with-stop', {
+        method: 'POST',
+        body: routeQuery,
+      });
+    },
+  },
+
+  reviews: {
+    getStationReviews: (stationId, params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/reviews/station/${stationId}${query ? `?${query}` : ''}`, { method: 'GET' });
+    },
+    getStationMedia: (stationId) => {
+      return request(`/reviews/station/${stationId}/media`, { method: 'GET' });
+    },
+    getUserStatus: (stationId) => {
+      return request(`/reviews/station/${stationId}/user-status`, { method: 'GET' });
+    },
+    submitReview: (stationId, formData) => {
+      return request(`/reviews/station/${stationId}`, {
+        method: 'POST',
+        body: formData,
+      });
+    },
+    updateReview: (reviewId, formData) => {
+      return request(`/reviews/${reviewId}`, {
+        method: 'PUT',
+        body: formData,
+      });
+    },
+    deleteReview: (reviewId) => {
+      return request(`/reviews/${reviewId}`, {
+        method: 'DELETE',
+      });
+    },
+    toggleHelpful: (reviewId) => {
+      return request(`/reviews/${reviewId}/helpful`, {
+        method: 'POST',
+      });
+    },
+    reportReview: (reviewId) => {
+      return request(`/reviews/${reviewId}/report`, {
+        method: 'POST',
+      });
+    },
+    recordVisit: (stationId, visitData = {}) => {
+      return request(`/reviews/station/${stationId}/record-visit`, {
+        method: 'POST',
+        body: visitData,
       });
     },
   },

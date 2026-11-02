@@ -1,5 +1,5 @@
 const { getPythonRecommendations } = require('../services/pythonRecommendationService');
-const { planEVRoute } = require('../services/routingService');
+const { planEVRoute, planEVRouteWithStop } = require('../services/routingService');
 
 // @desc    Get ranked station recommendations based on user location & preferences via Python engine
 // @route   POST /api/recommendations
@@ -104,7 +104,48 @@ const planRoute = async (req, res, next) => {
   }
 };
 
+// @desc    Calculate two-segment route with intermediate charging stop
+// @route   POST /api/recommendations/route/with-stop
+// @access  Public (Optional auth for personalized vehicle specs)
+const planRouteWithStop = async (req, res, next) => {
+  try {
+    const { from, to, stopStation, battery, vehicle } = req.body;
+
+    if (!from || !to) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide both starting location and destination.',
+      });
+    }
+
+    if (!stopStation || stopStation.latitude == null || stopStation.longitude == null) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid charging station stop with coordinates.',
+      });
+    }
+
+    const activeVehicle =
+      vehicle && vehicle.model
+        ? vehicle
+        : (req.user && req.user.vehicle && req.user.vehicle.model ? req.user.vehicle : null);
+
+    const result = await planEVRouteWithStop({
+      from,
+      to,
+      stopStation,
+      battery: battery !== undefined ? Number(battery) : 50,
+      vehicle: activeVehicle,
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStationRecommendations,
   planRoute,
+  planRouteWithStop,
 };
